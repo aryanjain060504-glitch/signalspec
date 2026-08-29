@@ -1,0 +1,61 @@
+{
+  "id": "signalspec-env-001",
+  "name": "SignalSpec Local Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "tokenExpiry",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "painPointId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "opportunityId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "prdId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

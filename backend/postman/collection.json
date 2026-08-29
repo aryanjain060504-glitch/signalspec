@@ -1,0 +1,369 @@
+{
+  "info": {
+    "name": "SignalSpec API",
+    "description": "Production-Ready API Collection for SignalSpec — AI-powered customer review discovery & PRD generator",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const tokenExpiry = pm.environment.get('tokenExpiry');",
+          "const now = Date.now();",
+          "if (tokenExpiry && now >= parseInt(tokenExpiry)) {",
+          "    pm.sendRequest({",
+          "        url: pm.environment.get('baseUrl') + '/api/v1/auth/refresh',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' }",
+          "    }, function (err, res) {",
+          "        if (!err && res.code === 200) {",
+          "            const token = res.json().data.accessToken;",
+          "            pm.environment.set('accessToken', token);",
+          "            pm.environment.set('tokenExpiry', Date.now() + 14 * 60 * 1000);",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health & Infrastructure",
+      "item": [
+        {
+          "name": "GET Liveness Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Healthy status', () => pm.expect(pm.response.json().status).to.eql('healthy'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Readiness Ready",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/ready"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Database ready', () => pm.expect(pm.response.json().status).to.eql('ready'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "POST Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"founder@signalspec.dev\",\n  \"password\": \"Password123!\",\n  \"name\": \"Signal Founder\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data?.accessToken) {",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('tokenExpiry', Date.now() + 14 * 60 * 1000);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"founder@signalspec.dev\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.data?.accessToken) {",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('tokenExpiry', Date.now() + 14 * 60 * 1000);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "POST Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. User Management",
+      "item": [
+        {
+          "name": "GET Me Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me"
+          }
+        },
+        {
+          "name": "GET GDPR Export",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/users/me/export"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Projects",
+      "item": [
+        {
+          "name": "POST Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Project Management SaaS Research\",\n  \"description\": \"Competitor review analysis for task dependencies and backlog tracking\",\n  \"targetIcp\": \"Indie SaaS founders and small product teams\",\n  \"competitors\": [\n    { \"name\": \"CompetitorA\", \"website\": \"https://competitor-a.com\" },\n    { \"name\": \"CompetitorB\", \"website\": \"https://competitor-b.com\" }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/projects"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) {",
+                  "  pm.environment.set('projectId', json.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET List Projects",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects?page=1&limit=20"
+          }
+        },
+        {
+          "name": "GET Project Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/dashboard"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reviews Ingestion",
+      "item": [
+        {
+          "name": "POST Import Reviews (JSON Batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviews\": [\n    {\n      \"reviewText\": \"Users struggle to manage task dependencies. It is so confusing when blockers occur.\",\n      \"product\": \"CompetitorA\",\n      \"rating\": 1,\n      \"source\": \"G2\"\n    },\n    {\n      \"reviewText\": \"Reporting limitations are frustrating. Cannot export custom CSV metrics for board meetings.\",\n      \"product\": \"CompetitorA\",\n      \"rating\": 2,\n      \"source\": \"Capterra\"\n    },\n    {\n      \"reviewText\": \"Mobile experience on iPad is clunky and crashes during task dragging.\",\n      \"product\": \"CompetitorB\",\n      \"rating\": 2,\n      \"source\": \"App Store\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/reviews/import"
+          }
+        },
+        {
+          "name": "GET List Project Reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/reviews?page=1&limit=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. AI Analysis & Jobs",
+      "item": [
+        {
+          "name": "POST Trigger Review Analysis",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/analyze"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202', () => pm.response.to.have.status(202));",
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) {",
+                  "  pm.environment.set('jobId', json.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Analysis Job Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/analysis-jobs/{{jobId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Pain Points & Opportunities",
+      "item": [
+        {
+          "name": "GET List Project Pain Points",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/pain-points"
+          }
+        },
+        {
+          "name": "GET List Project Opportunities",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/opportunities"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.data?.length > 0) {",
+                  "  pm.environment.set('opportunityId', json.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Opportunity Detail (with Evidence Quotes)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/opportunities/{{opportunityId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. PRD Generation & Export",
+      "item": [
+        {
+          "name": "POST Generate PRD from Opportunity",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/opportunities/{{opportunityId}}/generate-prd"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) {",
+                  "  pm.environment.set('prdId', json.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET PRD Detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/prds/{{prdId}}"
+          }
+        },
+        {
+          "name": "GET Export PRD (Markdown)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/prds/{{prdId}}/export?format=markdown"
+          }
+        }
+      ]
+    }
+  ]
+}
