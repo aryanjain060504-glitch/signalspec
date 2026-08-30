@@ -22,7 +22,7 @@ async function bootstrap() {
 
     // 5. Start Listening
     const PORT = env.PORT || 5000;
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       logger.info(`🚀 SignalSpec Backend Server running in [${env.NODE_ENV}] mode on port ${PORT}`);
       logger.info(`📡 Healthcheck available at: http://localhost:${PORT}/health`);
       logger.info(`📡 API v1 root available at: http://localhost:${PORT}/api/v1`);
