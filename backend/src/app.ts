@@ -31,18 +31,28 @@ app.use(passport.initialize());
 // 1. Security headers
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Allows SPA client consumption
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   })
 );
 
-// 2. CORS - Explicit allowed origins only
+// 2. CORS - Explicit allowed origins + all Vercel preview URLs
 const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
+
+// Matches any *.vercel.app subdomain (covers preview deployments automatically)
+const vercelPreviewRegex = /^https:\/\/[a-zA-Z0-9-]+-[a-zA-Z0-9]+-[a-zA-Z0-9-]+\.vercel\.app$/;
+const vercelProductionRegex = /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/;
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, postman) or if origin is in allowlist
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      if (
+        !origin ||
+        allowedOrigins.includes('*') ||
+        allowedOrigins.includes(origin) ||
+        vercelPreviewRegex.test(origin) ||
+        vercelProductionRegex.test(origin)
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked for origin: ${origin}`));
@@ -69,7 +79,7 @@ if (env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// 7. Health & Readiness endpoints (Public, unauthenticated, exempt from strict API rate limits)
+// 7. Health & Readiness endpoints
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'healthy',
@@ -82,33 +92,19 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/ready', (_req: Request, res: Response) => {
   const isDbReady = mongoose.connection.readyState === 1;
   if (isDbReady) {
-    res.status(200).json({
-      status: 'ready',
-      database: 'connected',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(200).json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() });
   } else {
-    res.status(503).json({
-      status: 'not_ready',
-      database: 'disconnected',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(503).json({ status: 'not_ready', database: 'disconnected', timestamp: new Date().toISOString() });
   }
 });
 
 // 8. Global API Rate Limiter
 const globalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 200, // 200 requests per minute
+  windowMs: 60 * 1000,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests. Please slow down.',
-    },
-  },
+  message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests. Please slow down.' } },
 });
 
 app.use('/api', globalLimiter);
@@ -126,15 +122,9 @@ apiV1.use(prdRoutes);
 
 app.use('/api/v1', apiV1);
 
-// 10. 404 Route Not Found Handler
+// 10. 404 Handler
 app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      code: 'NOT_FOUND',
-      message: 'The requested API endpoint does not exist',
-    },
-  });
+  res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'The requested API endpoint does not exist' } });
 });
 
 // 11. Central Error Handler (Always Last)
