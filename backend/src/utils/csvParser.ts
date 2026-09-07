@@ -23,7 +23,7 @@ export interface ParseResult {
  * Normalizes text for deduplication hashing
  */
 export function generateContentHash(product: string, text: string): string {
-  const normalized = `${product.trim().toLowerCase()}:${text.trim().toLowerCase().replace(/\s+/g, ' ')}`;
+  const normalized = `${product.trim().toLowerCase()}:${text.trim().toLowerCase().replace(/\\s+/g, ' ')}`;
   return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
@@ -68,7 +68,7 @@ export function parseReviewCSV(csvContent: string | Buffer): ParseResult {
   records.forEach((row) => {
     // Find text column
     const textKey = Object.keys(row).find((k) =>
-      /^(review_text|reviewtext|review|text|comment|feedback|content|body|description)$/i.test(k.trim())
+      /^(review_text|reviewtext|reviews|review|text|comment|feedback|content|body|description)$/i.test(k.trim())
     );
     const reviewText = textKey ? row[textKey]?.trim() : '';
 
@@ -79,7 +79,7 @@ export function parseReviewCSV(csvContent: string | Buffer): ParseResult {
 
     // Find product/competitor column
     const productKey = Object.keys(row).find((k) =>
-      /^(product|product_name|productname|competitor|competitor_name|app|app_name)$/i.test(k.trim())
+      /^(product|product_name|productname|company|competitor|competitor_name|app|app_name)$/i.test(k.trim())
     );
     const product = (productKey && row[productKey]?.trim()) || 'General';
 
