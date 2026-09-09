@@ -9,7 +9,7 @@ function setRefreshTokenCookie(res: Response, token: string): void {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/api/v1/auth',
   });
 }
@@ -26,10 +26,21 @@ function clearRefreshTokenCookie(res: Response): void {
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const meta = { userAgent: req.headers['user-agent'], ip: req.ip };
+      const meta = {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      };
+
       const result = await authService.register(req.body, meta);
       setRefreshTokenCookie(res, result.refreshToken);
-      res.status(201).json({ success: true, data: { user: result.user, accessToken: result.accessToken } });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.accessToken,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -37,10 +48,21 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const meta = { userAgent: req.headers['user-agent'], ip: req.ip };
+      const meta = {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      };
+
       const result = await authService.login(req.body, meta);
       setRefreshTokenCookie(res, result.refreshToken);
-      res.status(200).json({ success: true, data: { user: result.user, accessToken: result.accessToken } });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.accessToken,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -49,14 +71,33 @@ export class AuthController {
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME] || req.body?.refreshToken;
+
       if (!refreshToken) {
-        res.status(401).json({ success: false, error: { code: 'REFRESH_TOKEN_INVALID', message: 'Refresh token not found. Please log in again.' } });
+        res.status(401).json({
+          success: false,
+          error: {
+            code: 'REFRESH_TOKEN_INVALID',
+            message: 'Refresh token not found. Please log in again.',
+          },
+        });
         return;
       }
-      const meta = { userAgent: req.headers['user-agent'], ip: req.ip };
+
+      const meta = {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      };
+
       const result = await authService.refreshSession(refreshToken, meta);
       setRefreshTokenCookie(res, result.refreshToken);
-      res.status(200).json({ success: true, data: { user: result.user, accessToken: result.accessToken } });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.accessToken,
+        },
+      });
     } catch (error) {
       clearRefreshTokenCookie(res);
       next(error);
@@ -69,8 +110,13 @@ export class AuthController {
         const payloadSessionId = (req as any).sessionId;
         await authService.logout(req.user._id.toString(), payloadSessionId);
       }
+
       clearRefreshTokenCookie(res);
-      res.status(200).json({ success: true, data: { message: 'Logged out successfully' } });
+
+      res.status(200).json({
+        success: true,
+        data: { message: 'Logged out successfully' },
+      });
     } catch (error) {
       next(error);
     }
@@ -79,7 +125,10 @@ export class AuthController {
   async getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const sessions = await authService.listSessions(req.user!._id.toString());
-      res.status(200).json({ success: true, data: sessions });
+      res.status(200).json({
+        success: true,
+        data: sessions,
+      });
     } catch (error) {
       next(error);
     }
@@ -88,7 +137,49 @@ export class AuthController {
   async revokeSession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await authService.revokeSession(req.user!._id.toString(), req.params.sessionId!);
-      res.status(200).json({ success: true, data: { message: 'Session revoked successfully' } });
+      res.status(200).json({
+        success: true,
+        data: { message: 'Session revoked successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.body;
+      await authService.verifyEmail(token);
+      res.status(200).json({
+        success: true,
+        data: { message: 'Email verified successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      await authService.forgotPassword(email);
+      res.status(200).json({
+        success: true,
+        data: { message: 'If an account exists with that email, a password reset link has been sent.' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token, newPassword } = req.body;
+      await authService.resetPassword(token, newPassword);
+      res.status(200).json({
+        success: true,
+        data: { message: 'Password has been reset successfully' },
+      });
     } catch (error) {
       next(error);
     }
