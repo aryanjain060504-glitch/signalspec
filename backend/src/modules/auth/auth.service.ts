@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { User, IUser } from '../users/user.model';
 import { AppError } from '../../utils/ownershipCheck';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
+import { emailService } from '../../services/email.service';
+import { env } from '../../config/env';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes
@@ -36,11 +38,18 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const hashedVerificationToken = await bcrypt.hash(verificationToken, BCRYPT_ROUNDS);
+
     const user = new User({
       email: data.email,
       passwordHash,
       name: data.name,
       role: 'user',
+      isEmailVerified: false,
+      emailVerificationToken: hashedVerificationToken,
+      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
     const sessionId = crypto.randomUUID();
@@ -69,8 +78,14 @@ export class AuthService {
       userAgent: meta?.userAgent,
       ip: meta?.ip,
     });
-
     await user.save();
+
+    const verifyUrl = `${env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+    await emailService.sendEmail({
+      to: user.email,
+      subject: 'Verify your email for SignalSpec',
+      text: `Please verify your email by clicking on the following link: ${verifyUrl}`,
+    });
 
     return {
       user,
@@ -93,6 +108,10 @@ export class AuthService {
 
     if (!user || !user.passwordHash) {
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new AppError('Please verify your email before logging in.', 403, 'EMAIL_NOT_VERIFIED');
     }
 
     // Check account lockout
@@ -280,6 +299,95 @@ export class AuthService {
       $pull: { refreshTokens: { sessionId } },
     });
     if (!result) throw new AppError('User not found', 404, 'NOT_FOUND');
+  }
+
+  /**
+   * Verifies a user's email address using the token
+   */
+  async verifyEmail(token: string): Promise<void> {
+    const users = await User.find({
+      isEmailVerified: false,
+      emailVerificationExpires: { $gt: new Date() },
+    }).select('+emailVerificationToken');
+
+    let matchedUser = null;
+    for (const user of users) {
+      if (user.emailVerificationToken) {
+        const isMatch = await bcrypt.compare(token, user.emailVerificationToken);
+        if (isMatch) {
+          matchedUser = user;
+          break;
+        }
+      }
+    }
+
+    if (!matchedUser) {
+      throw new AppError('Invalid or expired verification token', 400, 'INVALID_TOKEN');
+    }
+
+    matchedUser.isEmailVerified = true;
+    matchedUser.emailVerificationToken = undefined;
+    matchedUser.emailVerificationExpires = undefined;
+    await matchedUser.save();
+  }
+
+  /**
+   * Initiates the password reset flow
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await User.findOne({ email, isDeleted: false });
+    if (!user) {
+      // Don't throw error to prevent email enumeration attacks
+      return;
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedResetToken = await bcrypt.hash(resetToken, BCRYPT_ROUNDS);
+
+    user.resetPasswordToken = hashedResetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const resetUrl = `${env.CLIENT_URL}/reset-password?token=${resetToken}`;
+    await emailService.sendEmail({
+      to: user.email,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Please go to this link to reset your password: ${resetUrl}`,
+    });
+  }
+
+  /**
+   * Completes the password reset flow
+   */
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const users = await User.find({
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken');
+
+    let matchedUser = null;
+    for (const user of users) {
+      if (user.resetPasswordToken) {
+        const isMatch = await bcrypt.compare(token, user.resetPasswordToken);
+        if (isMatch) {
+          matchedUser = user;
+          break;
+        }
+      }
+    }
+
+    if (!matchedUser) {
+      throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    matchedUser.passwordHash = newPasswordHash;
+    matchedUser.resetPasswordToken = undefined;
+    matchedUser.resetPasswordExpires = undefined;
+    
+    // Clear all active sessions for security
+    matchedUser.refreshTokens = [];
+    
+    await matchedUser.save();
   }
 }
 
