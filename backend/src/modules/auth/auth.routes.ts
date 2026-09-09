@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { authController } from './auth.controller';
 import { validate } from '../../middleware/validate';
 import { requireAuth } from '../../middleware/requireAuth';
-import { registerSchema, loginSchema, revokeSessionSchema } from './auth.schema';
+import { registerSchema, loginSchema, revokeSessionSchema, forgotPasswordSchema, resetPasswordSchema, verifyEmailSchema } from './auth.schema';
 
 const router = Router();
 
@@ -29,6 +29,19 @@ router.post('/register', authLimiter, validate(registerSchema), (req, res, next)
 router.post('/login', authLimiter, validate(loginSchema), (req, res, next) =>
   authController.login(req, res, next)
 );
+
+router.post('/verify-email', authLimiter, validate(verifyEmailSchema), (req, res, next) =>
+  authController.verifyEmail(req, res, next)
+);
+
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), (req, res, next) =>
+  authController.forgotPassword(req, res, next)
+);
+
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), (req, res, next) =>
+  authController.resetPassword(req, res, next)
+);
+
 
 router.post('/refresh', (req, res, next) =>
   authController.refresh(req, res, next)
