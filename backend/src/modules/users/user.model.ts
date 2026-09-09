@@ -17,6 +17,11 @@ export interface IUser extends Document {
   avatar?: string;
   googleId?: string;
   role: 'user' | 'admin';
+  isEmailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   refreshTokens: IRefreshTokenSession[];
   failedLoginAttempts: number;
   lockUntil?: Date;
@@ -69,6 +74,24 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ['user', 'admin'],
       default: 'user',
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+      select: false,
+    },
+    emailVerificationExpires: {
+      type: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
     },
     refreshTokens: [RefreshTokenSessionSchema],
     failedLoginAttempts: {
