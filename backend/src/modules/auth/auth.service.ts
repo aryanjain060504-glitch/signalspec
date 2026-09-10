@@ -39,17 +39,12 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const hashedVerificationToken = await bcrypt.hash(verificationToken, BCRYPT_ROUNDS);
-
     const user = new User({
       email: data.email,
       passwordHash,
       name: data.name,
       role: 'user',
-      isEmailVerified: false,
-      emailVerificationToken: hashedVerificationToken,
-      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      isEmailVerified: true,
     });
 
     const sessionId = crypto.randomUUID();
@@ -80,12 +75,8 @@ export class AuthService {
     });
     await user.save();
 
-    const verifyUrl = `${env.CLIENT_URL}/verify-email?token=${verificationToken}`;
-    await emailService.sendEmail({
-      to: user.email,
-      subject: 'Verify your email for SignalSpec',
-      text: `Please verify your email by clicking on the following link: ${verifyUrl}`,
-    });
+    // Email verification bypassed
+
 
     return {
       user,
