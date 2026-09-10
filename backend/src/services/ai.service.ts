@@ -52,6 +52,11 @@ export interface AnalysisPipelineOutput {
 
 export interface GeneratedPrdOutput {
   title: string;
+  metadata: {
+    status: string;
+    targetRelease: string;
+    date: string;
+  };
   overview: string;
   problemStatement: string;
   evidenceQuotes: Array<{
@@ -84,6 +89,9 @@ export interface GeneratedPrdOutput {
     timeframe: string;
   }>;
   acceptanceCriteria: string[];
+  technicalRequirements: string[];
+  risksAndDependencies: string[];
+  openQuestions: string[];
   rawMarkdown: string;
 }
 
@@ -277,6 +285,11 @@ Generate a detailed specification adhering to the SignalSpec PRD format.
 Return ONLY valid JSON matching this schema:
 {
   "title": "PRD: ${opportunity.title}",
+  "metadata": {
+    "status": "Draft",
+    "targetRelease": "Q3 2024",
+    "date": "YYYY-MM-DD"
+  },
   "overview": "Comprehensive overview of the feature/initiative",
   "problemStatement": "Clear problem statement grounded in the customer evidence",
   "evidenceQuotes": ${JSON.stringify(evidenceQuotes)},
@@ -313,6 +326,9 @@ Return ONLY valid JSON matching this schema:
     "All functional requirements pass automated tests",
     "Evidence quotes are verified against project reviews"
   ],
+  "technicalRequirements": ["Must support 10k concurrent users", "Requires migration to Postgres 14"],
+  "risksAndDependencies": ["Depends on Marketing API being ready", "Risk of breaking legacy auth"],
+  "openQuestions": ["Should we support mobile web immediately?"],
   "rawMarkdown": "# Markdown version of the PRD..."
 }`;
 
@@ -625,6 +641,27 @@ Return ONLY valid JSON matching this schema:
       'Ownership checks strictly prevent unauthorized cross-project access.',
     ];
 
+    const metadata = {
+      status: 'Draft',
+      targetRelease: 'Next Quarter',
+      date: new Date().toISOString().split('T')[0],
+    };
+
+    const technicalRequirements = [
+      'Must maintain sub-200ms API response times.',
+      'Requires updating the existing database schema to support the new data models.',
+    ];
+
+    const risksAndDependencies = [
+      'Dependency on third-party API availability for related feature integration.',
+      'Risk of user confusion if the legacy feature is deprecated too quickly.',
+    ];
+
+    const openQuestions = [
+      'What is the precise migration path for existing active users?',
+      'Should we gate this feature behind a premium tier immediately?',
+    ];
+
     const rawMarkdown = `
 # ${title}
 
@@ -671,7 +708,16 @@ ${edgeCases.map((ec) => `- ${ec}`).join('\n')}
 ## 10. Success Metrics
 ${successMetrics.map((sm) => `- **${sm.metric}:** ${sm.target} (${sm.timeframe})`).join('\n')}
 
-## 11. Definition of Done & Acceptance Criteria
+## 11. Technical Requirements & Constraints
+${technicalRequirements.map((tr) => `- ${tr}`).join('\n')}
+
+## 12. Risks & Dependencies
+${risksAndDependencies.map((rd) => `- ${rd}`).join('\n')}
+
+## 13. Open Questions
+${openQuestions.map((oq) => `- ${oq}`).join('\n')}
+
+## 14. Definition of Done & Acceptance Criteria
 ${acceptanceCriteria.map((ac) => `- [ ] ${ac}`).join('\n')}
     `.trim();
 
@@ -689,6 +735,10 @@ ${acceptanceCriteria.map((ac) => `- [ ] ${ac}`).join('\n')}
       edgeCases,
       successMetrics,
       acceptanceCriteria,
+      metadata,
+      technicalRequirements,
+      risksAndDependencies,
+      openQuestions,
       rawMarkdown,
     };
   }
