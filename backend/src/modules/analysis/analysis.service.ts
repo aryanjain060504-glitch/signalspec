@@ -15,6 +15,18 @@ export class AnalysisService {
    * Spawns an asynchronous analysis job for a project's reviews
    */
   async startAnalysis(userId: string, projectId: string): Promise<IAnalysisJob> {
+    const userAnalysisCount = await AnalysisJob.countDocuments({
+      userId: new Types.ObjectId(userId),
+    });
+
+    if (userAnalysisCount >= 2) {
+      throw new AppError(
+        'You have reached the maximum number of analyses (2) allowed on the free plan. Please upgrade to continue.',
+        403,
+        'ANALYSIS_LIMIT_REACHED'
+      );
+    }
+
     const project = await assertOwnership(Project, projectId, userId);
 
     const reviews = await Review.find({
