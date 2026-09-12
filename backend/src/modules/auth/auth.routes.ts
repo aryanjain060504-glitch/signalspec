@@ -22,11 +22,26 @@ const authLimiter = rateLimit({
   },
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many failed login attempts. Please try again later.',
+    },
+  },
+});
+
 router.post('/register', authLimiter, validate(registerSchema), (req, res, next) =>
   authController.register(req, res, next)
 );
 
-router.post('/login', authLimiter, validate(loginSchema), (req, res, next) =>
+router.post('/login', authLimiter, loginLimiter, validate(loginSchema), (req, res, next) =>
   authController.login(req, res, next)
 );
 
